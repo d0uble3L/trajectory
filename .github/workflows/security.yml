@@ -1,0 +1,111 @@
+name: Security Scanning
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: "0 2 * * 0" # Weekly scan
+
+jobs:
+  # Dependency vulnerability scanning
+  dependency-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run Trivy vulnerability scanner (dependencies)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: "fs"
+          scan-ref: "backend/requirements.txt"
+          format: "sarif"
+          output: "trivy-fs-results.sarif"
+
+      - name: Upload Trivy results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "trivy-fs-results.sarif"
+
+  # Secret scanning
+  secret-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: TruffleHog Secret Scan
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.repository.default_branch }}
+          head: HEAD
+          extra_args: --debug
+
+  # Python security checks
+  bandit-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - name: Install Bandit
+        run: pip install bandit[toml] sarif-om
+
+      - name: Run Bandit security scan
+        run: bandit -r backend/ -f json -o bandit-report.json
+        continue-on-error: true
+
+      - name: Convert Bandit to SARIF
+        run: |
+          python3 << 'EOF'
+          import json
+          with open('bandit-report.json') as f:
+            data = json.load(f)
+          print(json.dumps(data, indent=2))
+          EOF
+
+      - name: Upload Bandit results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "bandit-report.json"
+
+  # OWASP Dependency-Check
+  dependency-vulnerability-scan:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Run OWASP Dependency-Check
+        uses: dependency-check/Dependency-Check_Action@main
+        with:
+          path: "."
+          format: "SARIF"
+          args: >
+            --exclude node_modules
+            --exclude ".git"
+
+      - name: Upload OWASP Dependency-Check results
+        uses: github/codeql-action/upload-sarif@v2
+        if: always()
+        with:
+          sarif_file: "reports/dependency-check-report.sarif"
