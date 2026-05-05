@@ -4,7 +4,7 @@
 
 If you discover a security vulnerability in Trajectory, please **do not** open a public GitHub issue. Instead:
 
-1. **Email**: Security issues should be reported privately to michaeltayo@example.com (or use GitHub Security Advisory)
+1. **Email**: Security issues should be reported privately to michael@trilltayo.com (or use GitHub Security Advisory)
 2. **GitHub Security Tab**: Use "Security" → "Report a vulnerability" to create a private advisory
 3. **Include**:
    - Description of the vulnerability
