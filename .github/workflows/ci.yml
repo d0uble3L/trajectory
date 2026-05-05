@@ -1,0 +1,75 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt httpx
+      - name: Run API tests
+        run: |
+          python -c "
+          from fastapi.testclient import TestClient
+          from backend.main import app
+          client = TestClient(app)
+          payload = {
+              'current_net_worth': 50000, 'annual_income': 80000,
+              'monthly_investment': 1000, 'annual_return_rate': 0.08,
+              'annual_income_growth': 0.03, 'annual_expenses': 48000, 'years': 5
+          }
+          r = client.post('/api/project', json=payload)
+          assert r.status_code == 200, f'Expected 200, got {r.status_code}'
+          d = r.json()
+          assert 'scenarios' in d
+          assert all(k in d['scenarios'] for k in ('conservative', 'moderate', 'optimistic'))
+          assert 'summary' in d
+          print('All tests passed')
+          "
+
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: trajectory:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  security:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          format: sarif
+          output: trivy.sarif
+          severity: HIGH,CRITICAL
+      - name: Upload results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: trivy.sarif
