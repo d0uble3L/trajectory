@@ -1,0 +1,1014 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Trajectory — Net Worth Visualizer</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;0,700;1,400&family=DM+Mono:wght@300;400;500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --bg:         #07070e;
+      --surface:    #0c0c18;
+      --surface-2:  #111120;
+      --surface-3:  #1a1a2e;
+      --border:     rgba(139, 92, 246, 0.1);
+      --border-2:   rgba(139, 92, 246, 0.22);
+
+      --accent:         #8b5cf6;
+      --accent-dim:     rgba(139, 92, 246, 0.15);
+      --accent-glow:    rgba(139, 92, 246, 0.35);
+
+      --conservative:     #fb7185;
+      --moderate:         #818cf8;
+      --optimistic:       #34d399;
+      --conservative-dim: rgba(251,113,133,0.1);
+      --moderate-dim:     rgba(129,140,248,0.12);
+      --optimistic-dim:   rgba(52,211,153,0.1);
+
+      --text:          #f1f5f9;
+      --text-sec:      #94a3b8;
+      --text-muted:    #4b5563;
+
+      --radius:    12px;
+      --radius-sm: 8px;
+      --ease:      cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    html { font-size: 16px; -webkit-font-smoothing: antialiased; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', system-ui, sans-serif;
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+    ::-webkit-scrollbar-thumb:hover { background: var(--text-muted); }
+
+    /* ── HEADER ──────────────────────────────── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 32px;
+      border-bottom: 1px solid var(--border);
+      background: rgba(7,7,14,0.85);
+      backdrop-filter: blur(16px);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .logo-name {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      background: linear-gradient(130deg, #c4b5fd 0%, #818cf8 45%, #6366f1 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      display: block;
+      line-height: 1;
+    }
+
+    .logo-sub {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      letter-spacing: 0.14em;
+      text-transform: uppercase;
+      margin-top: 3px;
+      display: block;
+    }
+
+    .live-badge {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 6px 14px;
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      letter-spacing: 0.06em;
+      background: var(--surface);
+    }
+
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: var(--optimistic);
+      animation: pulse 2.4s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:0.4; transform:scale(0.75); }
+    }
+
+    /* ── STATS STRIP ─────────────────────────── */
+    .stats-strip {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .stat-card {
+      padding: 22px 32px;
+      border-right: 1px solid var(--border);
+      position: relative;
+      overflow: hidden;
+    }
+    .stat-card:last-child { border-right: none; }
+    .stat-card:first-child::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(139,92,246,0.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .stat-label {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      letter-spacing: 0.13em;
+      text-transform: uppercase;
+      font-weight: 500;
+      margin-bottom: 7px;
+    }
+
+    .stat-value {
+      font-family: 'DM Mono', monospace;
+      font-size: 1.65rem;
+      font-weight: 400;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      color: var(--text);
+      margin-bottom: 4px;
+      transition: color 200ms var(--ease);
+    }
+    .stat-card:first-child .stat-value {
+      background: linear-gradient(130deg, #c4b5fd, #818cf8);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .stat-sub {
+      font-size: 0.66rem;
+      color: var(--text-muted);
+    }
+
+    /* ── MAIN LAYOUT ─────────────────────────── */
+    .main-content {
+      display: grid;
+      grid-template-columns: 370px 1fr;
+      height: calc(100vh - 130px);
+    }
+
+    /* ── LEFT PANEL ──────────────────────────── */
+    .left-panel {
+      border-right: 1px solid var(--border);
+      padding: 28px 28px 40px;
+      overflow-y: auto;
+      background: var(--surface);
+      display: flex;
+      flex-direction: column;
+      gap: 0;
+    }
+
+    .panel-heading {
+      font-family: 'Playfair Display', serif;
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+      margin-bottom: 24px;
+    }
+
+    .input-block {
+      margin-bottom: 22px;
+    }
+
+    .input-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      margin-bottom: 9px;
+    }
+
+    .input-label {
+      font-size: 0.78rem;
+      color: var(--text-sec);
+      font-weight: 500;
+    }
+
+    .input-display {
+      font-family: 'DM Mono', monospace;
+      font-size: 0.8rem;
+      color: var(--accent);
+      letter-spacing: -0.01em;
+    }
+
+    /* Range Slider */
+    input[type="range"] {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 3px;
+      border-radius: 2px;
+      outline: none;
+      cursor: pointer;
+      margin-bottom: 8px;
+      accent-color: var(--accent);
+      background: linear-gradient(
+        to right,
+        var(--accent) 0%,
+        var(--accent) var(--fill, 0%),
+        var(--surface-3) var(--fill, 0%),
+        var(--surface-3) 100%
+      );
+    }
+
+    input[type="range"]::-webkit-slider-runnable-track {
+      height: 3px;
+      border-radius: 2px;
+    }
+
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: #fff;
+      box-shadow: 0 0 0 2.5px var(--accent), 0 2px 6px rgba(0,0,0,0.5);
+      cursor: pointer;
+      margin-top: -6px;
+      transition: box-shadow 180ms var(--ease), transform 180ms var(--ease);
+    }
+
+    input[type="range"]:hover::-webkit-slider-thumb,
+    input[type="range"]:focus::-webkit-slider-thumb {
+      box-shadow: 0 0 0 2.5px var(--accent), 0 0 10px var(--accent-glow), 0 2px 6px rgba(0,0,0,0.5);
+      transform: scale(1.18);
+    }
+
+    input[type="range"]::-moz-range-thumb {
+      width: 15px; height: 15px;
+      border-radius: 50%;
+      background: #fff;
+      border: 2.5px solid var(--accent);
+      cursor: pointer;
+    }
+
+    /* Number Input */
+    .num-wrap {
+      position: relative;
+    }
+
+    .num-wrap input[type="number"] {
+      width: 100%;
+      padding: 7px 10px;
+      background: var(--surface-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.82rem;
+      outline: none;
+      transition: border-color 180ms var(--ease), box-shadow 180ms var(--ease);
+      -moz-appearance: textfield;
+    }
+
+    .num-wrap input[type="number"]:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    .num-wrap input[type="number"]::-webkit-inner-spin-button,
+    .num-wrap input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; }
+
+    .num-prefix {
+      position: absolute;
+      left: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+
+    .num-suffix {
+      position: absolute;
+      right: 10px; top: 50%;
+      transform: translateY(-50%);
+      color: var(--text-muted);
+      font-family: 'DM Mono', monospace;
+      font-size: 0.78rem;
+      pointer-events: none;
+    }
+
+    .has-prefix input[type="number"] { padding-left: 22px; }
+    .has-suffix input[type="number"] { padding-right: 26px; }
+
+    .divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 18px 0 22px;
+    }
+
+    /* ── RIGHT PANEL ─────────────────────────── */
+    .right-panel {
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* Chart section */
+    .chart-section {
+      padding: 28px 32px;
+      flex-shrink: 0;
+    }
+
+    .chart-top {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+
+    .chart-title {
+      font-family: 'Playfair Display', serif;
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--text);
+      line-height: 1.2;
+    }
+
+    .chart-sub {
+      font-size: 0.68rem;
+      color: var(--text-muted);
+      margin-top: 3px;
+    }
+
+    .legend {
+      display: flex;
+      gap: 18px;
+      align-items: center;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.7rem;
+      color: var(--text-sec);
+    }
+
+    .legend-line {
+      width: 18px; height: 2px;
+      border-radius: 1px;
+    }
+
+    .legend-dash {
+      width: 18px; height: 2px;
+      border-radius: 1px;
+      background: repeating-linear-gradient(
+        to right,
+        currentColor 0, currentColor 4px,
+        transparent 4px, transparent 7px
+      );
+    }
+
+    .chart-canvas-wrap {
+      position: relative;
+      height: 290px;
+    }
+
+    .loading-veil {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(7,7,14,0.55);
+      backdrop-filter: blur(3px);
+      border-radius: var(--radius);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 150ms var(--ease);
+      z-index: 10;
+    }
+
+    .loading-veil.active { opacity: 1; pointer-events: all; }
+
+    .spinner {
+      width: 22px; height: 22px;
+      border: 2px solid var(--surface-3);
+      border-top-color: var(--accent);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* Table section */
+    .table-section {
+      border-top: 1px solid var(--border);
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .table-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 16px 32px 0;
+      flex-shrink: 0;
+    }
+
+    .table-heading {
+      font-size: 0.62rem;
+      color: var(--text-muted);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      font-weight: 500;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 4px;
+    }
+
+    .tab {
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 0.68rem;
+      border: 1px solid transparent;
+      background: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-weight: 500;
+      letter-spacing: 0.03em;
+      transition: all 160ms var(--ease);
+      font-family: 'Inter', sans-serif;
+    }
+
+    .tab:hover { color: var(--text-sec); border-color: var(--border); }
+
+    .tab.is-conservative { border-color: var(--conservative); color: var(--conservative); background: var(--conservative-dim); }
+    .tab.is-moderate     { border-color: var(--moderate);     color: var(--moderate);     background: var(--moderate-dim); }
+    .tab.is-optimistic   { border-color: var(--optimistic);   color: var(--optimistic);   background: var(--optimistic-dim); }
+
+    .table-scroll {
+      overflow-y: auto;
+      overflow-x: auto;
+      padding: 14px 32px 32px;
+      flex: 1;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.78rem;
+    }
+
+    thead th {
+      text-align: left;
+      padding: 8px 14px 10px;
+      color: var(--text-muted);
+      font-size: 0.61rem;
+      letter-spacing: 0.11em;
+      text-transform: uppercase;
+      font-weight: 500;
+      border-bottom: 1px solid var(--border);
+      white-space: nowrap;
+    }
+    thead th:first-child { padding-left: 0; }
+
+    tbody tr { transition: background 140ms var(--ease); }
+    tbody tr:hover { background: rgba(139,92,246,0.04); }
+
+    tbody td {
+      padding: 11px 14px;
+      border-bottom: 1px solid rgba(255,255,255,0.025);
+      vertical-align: middle;
+      white-space: nowrap;
+    }
+    tbody td:first-child { padding-left: 0; }
+
+    .c-year    { font-family: 'DM Mono', monospace; color: var(--text-muted); font-size: 0.74rem; }
+    .c-nw      { font-family: 'DM Mono', monospace; color: var(--text); font-weight: 500; }
+    .c-contrib { font-family: 'DM Mono', monospace; color: var(--text-sec); }
+    .c-gains   { font-family: 'DM Mono', monospace; color: var(--optimistic); }
+    .c-passive { font-family: 'DM Mono', monospace; color: var(--moderate); }
+
+    .sr-wrap { display: flex; align-items: center; gap: 8px; }
+    .sr-bar  {
+      height: 3px;
+      border-radius: 2px;
+      background: var(--accent);
+      transition: width 400ms var(--ease);
+      flex-shrink: 0;
+    }
+    .sr-val  { font-family: 'DM Mono', monospace; color: var(--text-sec); font-size: 0.74rem; }
+
+    /* ── RESPONSIVE ──────────────────────────── */
+    @media (max-width: 980px) {
+      .main-content { grid-template-columns: 1fr; height: auto; }
+      .left-panel { border-right: none; border-bottom: 1px solid var(--border); }
+      .stats-strip { grid-template-columns: repeat(2,1fr); }
+      .stat-card:nth-child(2) { border-right: none; }
+      .stat-card:nth-child(3) { border-right: 1px solid var(--border); border-top: 1px solid var(--border); }
+      .stat-card:nth-child(4) { border-top: 1px solid var(--border); }
+    }
+
+    @media (max-width: 560px) {
+      header { padding: 14px 18px; }
+      .stat-card { padding: 16px 18px; }
+      .stat-value { font-size: 1.2rem; }
+      .left-panel { padding: 20px 18px 32px; }
+      .chart-section { padding: 20px 18px; }
+      .table-top, .table-scroll { padding-left: 18px; padding-right: 18px; }
+      .legend { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── HEADER ── -->
+  <header>
+    <div>
+      <span class="logo-name">TRAJECTORY</span>
+      <span class="logo-sub">5-Year Net Worth Visualizer</span>
+    </div>
+    <div class="live-badge">
+      <span class="live-dot"></span>
+      Live Projection
+    </div>
+  </header>
+
+  <!-- ── STATS STRIP ── -->
+  <div class="stats-strip">
+    <div class="stat-card">
+      <div class="stat-label">Projected Net Worth</div>
+      <div class="stat-value" id="stat-nw">—</div>
+      <div class="stat-sub">year <span id="stat-yr">5</span> · moderate</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Investment Gains</div>
+      <div class="stat-value" id="stat-gains">—</div>
+      <div class="stat-sub">above contributions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Passive Income</div>
+      <div class="stat-value" id="stat-passive">—</div>
+      <div class="stat-sub">annual · 4% SWR</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Savings Rate</div>
+      <div class="stat-value" id="stat-sr">—</div>
+      <div class="stat-sub">income after expenses</div>
+    </div>
+  </div>
+
+  <!-- ── MAIN ── -->
+  <div class="main-content">
+
+    <!-- Left: Inputs -->
+    <div class="left-panel">
+      <div class="panel-heading">Parameters</div>
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Current Net Worth</span>
+          <span class="input-display" id="disp-current_net_worth">$50,000</span>
+        </div>
+        <input type="range" id="sl-current_net_worth" min="0" max="2000000" step="1000" value="50000">
+        <div class="num-wrap has-prefix">
+          <span class="num-prefix">$</span>
+          <input type="number" id="in-current_net_worth" value="50000" min="0" max="2000000" step="1000">
+        </div>
+      </div>
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Annual Income</span>
+          <span class="input-display" id="disp-annual_income">$80,000</span>
+        </div>
+        <input type="range" id="sl-annual_income" min="0" max="500000" step="1000" value="80000">
+        <div class="num-wrap has-prefix">
+          <span class="num-prefix">$</span>
+          <input type="number" id="in-annual_income" value="80000" min="0" max="500000" step="1000">
+        </div>
+      </div>
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Monthly Investment</span>
+          <span class="input-display" id="disp-monthly_investment">$1,000</span>
+        </div>
+        <input type="range" id="sl-monthly_investment" min="0" max="20000" step="100" value="1000">
+        <div class="num-wrap has-prefix">
+          <span class="num-prefix">$</span>
+          <input type="number" id="in-monthly_investment" value="1000" min="0" max="20000" step="100">
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Expected Annual Return</span>
+          <span class="input-display" id="disp-annual_return_rate">8.0%</span>
+        </div>
+        <input type="range" id="sl-annual_return_rate" min="0" max="0.20" step="0.001" value="0.08">
+        <div class="num-wrap has-suffix">
+          <input type="number" id="in-annual_return_rate" value="8.0" min="0" max="20" step="0.1">
+          <span class="num-suffix">%</span>
+        </div>
+      </div>
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Income Growth Rate</span>
+          <span class="input-display" id="disp-annual_income_growth">3.0%</span>
+        </div>
+        <input type="range" id="sl-annual_income_growth" min="0" max="0.15" step="0.001" value="0.03">
+        <div class="num-wrap has-suffix">
+          <input type="number" id="in-annual_income_growth" value="3.0" min="0" max="15" step="0.1">
+          <span class="num-suffix">%</span>
+        </div>
+      </div>
+
+      <hr class="divider">
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Annual Expenses</span>
+          <span class="input-display" id="disp-annual_expenses">$48,000</span>
+        </div>
+        <input type="range" id="sl-annual_expenses" min="0" max="300000" step="1000" value="48000">
+        <div class="num-wrap has-prefix">
+          <span class="num-prefix">$</span>
+          <input type="number" id="in-annual_expenses" value="48000" min="0" max="300000" step="1000">
+        </div>
+      </div>
+
+      <div class="input-block">
+        <div class="input-header">
+          <span class="input-label">Projection Horizon</span>
+          <span class="input-display" id="disp-years">5 years</span>
+        </div>
+        <input type="range" id="sl-years" min="1" max="30" step="1" value="5">
+        <div class="num-wrap has-suffix">
+          <input type="number" id="in-years" value="5" min="1" max="30" step="1">
+          <span class="num-suffix">yr</span>
+        </div>
+      </div>
+
+    </div><!-- /left-panel -->
+
+    <!-- Right: Chart + Table -->
+    <div class="right-panel">
+
+      <div class="chart-section">
+        <div class="chart-top">
+          <div>
+            <div class="chart-title">Net Worth Trajectory</div>
+            <div class="chart-sub">Three scenarios based on ±2% return rate variance</div>
+          </div>
+          <div class="legend">
+            <div class="legend-item">
+              <div class="legend-dash" style="color:var(--conservative);"></div>
+              <span>Conservative</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-line" style="background:var(--moderate);"></div>
+              <span>Moderate</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dash" style="color:var(--optimistic);"></div>
+              <span>Optimistic</span>
+            </div>
+          </div>
+        </div>
+        <div class="chart-canvas-wrap">
+          <div class="loading-veil" id="loadingVeil"><div class="spinner"></div></div>
+          <canvas id="chart"></canvas>
+        </div>
+      </div>
+
+      <div class="table-section">
+        <div class="table-top">
+          <span class="table-heading">Year-by-Year Breakdown</span>
+          <div class="tabs">
+            <button class="tab" id="tab-conservative" onclick="switchTab('conservative')">Conservative</button>
+            <button class="tab is-moderate" id="tab-moderate" onclick="switchTab('moderate')">Moderate</button>
+            <button class="tab" id="tab-optimistic" onclick="switchTab('optimistic')">Optimistic</button>
+          </div>
+        </div>
+        <div class="table-scroll">
+          <table id="dataTable">
+            <thead>
+              <tr>
+                <th>Year</th>
+                <th>Net Worth</th>
+                <th>Contributed</th>
+                <th>Market Gains</th>
+                <th>Passive Income</th>
+                <th>Savings Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="6" style="text-align:center;color:var(--text-muted);padding:36px 0;">Loading projections…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div><!-- /right-panel -->
+  </div><!-- /main-content -->
+
+  <script>
+  (() => {
+    // ── STATE ──────────────────────────────────
+    const S = {
+      current_net_worth:   50000,
+      annual_income:       80000,
+      monthly_investment:  1000,
+      annual_return_rate:  0.08,
+      annual_income_growth:0.03,
+      annual_expenses:     48000,
+      years:               5,
+    };
+
+    let currentData = null;
+    let activeTab   = 'moderate';
+    let prevStats   = { nw: 0, gains: 0, passive: 0, sr: 0 };
+    let chart       = null;
+    let debounce    = null;
+
+    // ── FORMATTERS ────────────────────────────
+    const usd = (n) => new Intl.NumberFormat('en-US', {
+      style: 'currency', currency: 'USD',
+      minimumFractionDigits: 0, maximumFractionDigits: 0
+    }).format(n);
+
+    const compact = (n) => {
+      const a = Math.abs(n);
+      if (a >= 1e6) return `$${(n / 1e6).toFixed(2)}M`;
+      if (a >= 1e3) return `$${Math.round(n / 1e3)}K`;
+      return `$${Math.round(n)}`;
+    };
+
+    const pct = (n, d = 1) => `${n.toFixed(d)}%`;
+
+    // ── INPUT CONFIG ──────────────────────────
+    const CONFIGS = {
+      current_net_worth:    { slMin:0, slMax:2000000, isP:false, disp: v => usd(v) },
+      annual_income:        { slMin:0, slMax:500000,  isP:false, disp: v => usd(v) },
+      monthly_investment:   { slMin:0, slMax:20000,   isP:false, disp: v => usd(v) },
+      annual_return_rate:   { slMin:0, slMax:0.20,    isP:true,  disp: v => pct(v * 100) },
+      annual_income_growth: { slMin:0, slMax:0.15,    isP:true,  disp: v => pct(v * 100) },
+      annual_expenses:      { slMin:0, slMax:300000,  isP:false, disp: v => usd(v) },
+      years:                { slMin:1, slMax:30,      isP:false, disp: v => `${v} year${v !== 1 ? 's' : ''}` },
+    };
+
+    // ── SLIDER FILL ───────────────────────────
+    function fillSlider(sl) {
+      const lo = parseFloat(sl.min), hi = parseFloat(sl.max), v = parseFloat(sl.value);
+      sl.style.setProperty('--fill', `${((v - lo) / (hi - lo)) * 100}%`);
+    }
+
+    // ── INIT INPUTS ───────────────────────────
+    function initInputs() {
+      Object.entries(CONFIGS).forEach(([key, cfg]) => {
+        const sl   = document.getElementById(`sl-${key}`);
+        const inp  = document.getElementById(`in-${key}`);
+        const disp = document.getElementById(`disp-${key}`);
+        if (!sl || !inp) return;
+
+        const v = S[key];
+        sl.value  = v;
+        inp.value = cfg.isP ? (v * 100).toFixed(1) : v;
+        if (disp) disp.textContent = cfg.disp(v);
+        fillSlider(sl);
+
+        sl.addEventListener('input', () => {
+          const val = parseFloat(sl.value);
+          S[key] = val;
+          inp.value = cfg.isP ? (val * 100).toFixed(1) : val;
+          if (disp) disp.textContent = cfg.disp(val);
+          if (key === 'years') document.getElementById('stat-yr').textContent = val;
+          fillSlider(sl);
+          queue();
+        });
+
+        inp.addEventListener('input', () => {
+          let raw = parseFloat(inp.value);
+          if (isNaN(raw)) return;
+          const sv = cfg.isP ? raw / 100 : raw;
+          const clamped = Math.max(cfg.slMin, Math.min(cfg.slMax, sv));
+          S[key] = clamped;
+          sl.value = clamped;
+          if (disp) disp.textContent = cfg.disp(clamped);
+          if (key === 'years') document.getElementById('stat-yr').textContent = Math.round(clamped);
+          fillSlider(sl);
+          queue();
+        });
+      });
+    }
+
+    // ── ANIMATE NUMBER ────────────────────────
+    function animNum(el, from, to, ms, fmt) {
+      const t0 = performance.now();
+      (function tick(now) {
+        const p = Math.min((now - t0) / ms, 1);
+        const e = 1 - Math.pow(1 - p, 3);
+        el.textContent = fmt(from + (to - from) * e);
+        if (p < 1) requestAnimationFrame(tick);
+      })(performance.now());
+    }
+
+    // ── UPDATE STATS ──────────────────────────
+    function updateStats(s) {
+      animNum(document.getElementById('stat-nw'),     prevStats.nw,     s.projected_net_worth,   380, compact);
+      animNum(document.getElementById('stat-gains'),  prevStats.gains,  s.total_gain,            380, v => `+${compact(v)}`);
+      animNum(document.getElementById('stat-passive'),prevStats.passive, s.passive_income_final, 380, v => `${compact(v)}/yr`);
+      animNum(document.getElementById('stat-sr'),     prevStats.sr,     s.savings_rate,          380, v => pct(v));
+      prevStats = { nw: s.projected_net_worth, gains: s.total_gain, passive: s.passive_income_final, sr: s.savings_rate };
+    }
+
+    // ── CHART ─────────────────────────────────
+    function initChart() {
+      const ctx = document.getElementById('chart').getContext('2d');
+      chart = new Chart(ctx, {
+        type: 'line',
+        data: { labels: [], datasets: [
+          {
+            label: 'Conservative',
+            data: [], borderColor: '#fb7185',
+            backgroundColor: 'rgba(251,113,133,0.04)',
+            borderWidth: 2, tension: 0.42, fill: false,
+            borderDash: [6,3],
+            pointRadius: 4, pointBackgroundColor: '#fb7185',
+            pointBorderColor: '#07070e', pointBorderWidth: 2, pointHoverRadius: 6,
+          },
+          {
+            label: 'Moderate',
+            data: [], borderColor: '#818cf8',
+            backgroundColor: (ctx) => {
+              const g = ctx.chart.ctx.createLinearGradient(0, 0, 0, ctx.chart.height);
+              g.addColorStop(0, 'rgba(129,140,248,0.18)');
+              g.addColorStop(1, 'rgba(129,140,248,0.01)');
+              return g;
+            },
+            borderWidth: 2.5, tension: 0.42, fill: 'origin',
+            pointRadius: 5, pointBackgroundColor: '#818cf8',
+            pointBorderColor: '#07070e', pointBorderWidth: 2, pointHoverRadius: 7,
+          },
+          {
+            label: 'Optimistic',
+            data: [], borderColor: '#34d399',
+            backgroundColor: 'rgba(52,211,153,0.04)',
+            borderWidth: 2, tension: 0.42, fill: false,
+            borderDash: [6,3],
+            pointRadius: 4, pointBackgroundColor: '#34d399',
+            pointBorderColor: '#07070e', pointBorderWidth: 2, pointHoverRadius: 6,
+          },
+        ]},
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 550, easing: 'easeInOutQuart' },
+          interaction: { mode: 'index', intersect: false },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              backgroundColor: '#111120',
+              borderColor: 'rgba(139,92,246,0.28)',
+              borderWidth: 1,
+              titleColor: '#64748b',
+              bodyColor: '#f1f5f9',
+              titleFont: { family: 'Inter', size: 11, weight: '500' },
+              bodyFont: { family: 'DM Mono', size: 12 },
+              padding: { top:10, bottom:10, left:14, right:14 },
+              callbacks: {
+                title: (items) => items[0].label,
+                label: (ctx) => `  ${ctx.dataset.label}:  ${usd(ctx.parsed.y)}`,
+              }
+            }
+          },
+          scales: {
+            x: {
+              grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
+              border: { display: false },
+              ticks: { color: '#4b5563', font: { family: 'DM Mono', size: 11 }, padding: 8 }
+            },
+            y: {
+              grid: { color: 'rgba(255,255,255,0.035)', drawBorder: false },
+              border: { display: false },
+              ticks: {
+                color: '#4b5563',
+                font: { family: 'DM Mono', size: 11 },
+                padding: 12,
+                callback: v => compact(v),
+              }
+            }
+          }
+        }
+      });
+    }
+
+    function updateChart(scenarios) {
+      const yrs = S.years;
+      const labels = ['Now', ...Array.from({ length: yrs }, (_, i) => `Yr ${i + 1}`)];
+      const nw = S.current_net_worth;
+      chart.data.labels = labels;
+      chart.data.datasets[0].data = [nw, ...scenarios.conservative.map(d => d.net_worth)];
+      chart.data.datasets[1].data = [nw, ...scenarios.moderate.map(d => d.net_worth)];
+      chart.data.datasets[2].data = [nw, ...scenarios.optimistic.map(d => d.net_worth)];
+      chart.update();
+    }
+
+    // ── TABLE ─────────────────────────────────
+    function switchTab(scenario) {
+      activeTab = scenario;
+      ['conservative','moderate','optimistic'].forEach(s => {
+        document.getElementById(`tab-${s}`).className = 'tab';
+      });
+      document.getElementById(`tab-${scenario}`).className = `tab is-${scenario}`;
+      if (currentData) renderTable(currentData.scenarios[activeTab]);
+    }
+
+    function renderTable(rows) {
+      const tbody = document.querySelector('#dataTable tbody');
+      tbody.innerHTML = rows.map(r => {
+        const barW = Math.min(64, r.savings_rate * 0.64);
+        return `<tr>
+          <td class="c-year">Year ${r.year}</td>
+          <td class="c-nw">${usd(r.net_worth)}</td>
+          <td class="c-contrib">${usd(r.total_invested)}</td>
+          <td class="c-gains">+${usd(r.investment_gains)}</td>
+          <td class="c-passive">${usd(r.passive_income)}/yr</td>
+          <td>
+            <div class="sr-wrap">
+              <div class="sr-bar" style="width:${barW}px"></div>
+              <span class="sr-val">${pct(r.savings_rate)}</span>
+            </div>
+          </td>
+        </tr>`;
+      }).join('');
+    }
+
+    // ── FETCH ─────────────────────────────────
+    async function fetchData() {
+      const veil = document.getElementById('loadingVeil');
+      veil.classList.add('active');
+      try {
+        const res = await fetch('/api/project', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(S),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        currentData = data;
+        updateStats(data.summary);
+        updateChart(data.scenarios);
+        renderTable(data.scenarios[activeTab]);
+      } catch (err) {
+        console.error('[Trajectory]', err);
+      } finally {
+        veil.classList.remove('active');
+      }
+    }
+
+    function queue() {
+      clearTimeout(debounce);
+      debounce = setTimeout(fetchData, 240);
+    }
+
+    // ── BOOT ──────────────────────────────────
+    initChart();
+    initInputs();
+    fetchData();
+  })();
+  </script>
+</body>
+</html>
